@@ -9,7 +9,7 @@ from fastapi.exception_handlers import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -20,7 +20,7 @@ from database import engine, get_db
 from routers import posts, users
 
 
-# thsi is modern way relapcaces the seperate startup and shutdown
+# this is modern way relapcaces the seperate startup and shutdown
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     yield
@@ -36,6 +36,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(posts.router, prefix="/api/posts", tags=["Posts"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
+
+
+@app.get("/health")
+async def health_check(db: Annotated[AsyncSession, Depends(get_db)]):
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection error",
+        ) from e
+    return {"status": "healthy"}
 
 
 # home
